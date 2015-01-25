@@ -1,7 +1,9 @@
 [package]
 name = "sha1-hasher"
 version = "0.0.1"
-authors = ["Armin Ronacher <armin.ronacher@active-4.com>", "Konstantin Stepanov <me@kstep.me>"]
-keywords = ["sha1"]
+authors = ["Armin Ronacher <armin.ronacher@active-4.com>",
+	       "Konstantin Stepanov <me@kstep.me>",
+	       "Sebastian Thiel <byronimo@gmail.com>"]
+keywords = ["sha1", "cryptography"]
 description = "Minimal implementation of SHA1 for Rust (with fixes and Hasher trait implementation)"
 license = "BSD-3-Clause"
