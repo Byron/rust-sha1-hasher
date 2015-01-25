@@ -50,7 +50,7 @@ fn test_dirty_run() {
 }
 
 #[bench]
-fn test_sha1_speed(b: &mut Bencher) {
+fn sha1_text_digest_with_assertion(b: &mut Bencher) {
     let mut m = Sha1::new();
     let s = "The quick brown fox jumps over the lazy dog.";
     let n = 1000u64;
