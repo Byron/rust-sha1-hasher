@@ -13,13 +13,14 @@ fn test_simple() {
 
     let tests = [
         ("The quick brown fox jumps over the lazy dog",
-        "2fd4e1c67a2d28fced849ee1bb76e7391b93eb12"),
+                                "2fd4e1c67a2d28fced849ee1bb76e7391b93eb12"),
         ("The quick brown fox jumps over the lazy cog",
-        "de9f2c7fd25e1b3afad3e85a0bd17d9b100db4b3"),
+                                "de9f2c7fd25e1b3afad3e85a0bd17d9b100db4b3"),
         ("", "da39a3ee5e6b4b0d3255bfef95601890afd80709"),
-        ("testing\n", "9801739daae44ec5293d4e1f53d3f4d2d426d91c"),
+        ("testing\n", 
+                                "9801739daae44ec5293d4e1f53d3f4d2d426d91c"),
         ("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-        "025ecbd5d70f8fb3c5457cd96bab13fda305dc59"),
+                                "025ecbd5d70f8fb3c5457cd96bab13fda305dc59"),
     ];
 
     for &(s, ref h) in tests.iter() {
@@ -50,6 +51,15 @@ fn test_dirty_run() {
 }
 
 #[bench]
+fn sha1_finish_performance(b: &mut test::Bencher) {
+    let mut h = Sha1::new();
+    b.iter(|| {
+        h.write("h".as_bytes());
+        test::black_box(h.hexdigest());
+    })
+}
+
+#[bench]
 fn sha1_text_digest_with_assertion(b: &mut Bencher) {
     let mut m = Sha1::new();
     let s = "The quick brown fox jumps over the lazy dog.";
@@ -61,6 +71,8 @@ fn sha1_text_digest_with_assertion(b: &mut Bencher) {
         for _ in range(0, n) {
             m.write(s.as_bytes());
         }
+        assert_eq!(m.hexdigest(), "7ca27655f67fceaa78ed2e645a81c7f1d6e249d2");
+        // can be called multiple times with the same result
         assert_eq!(m.hexdigest(), "7ca27655f67fceaa78ed2e645a81c7f1d6e249d2");
     });
 }

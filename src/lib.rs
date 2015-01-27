@@ -24,18 +24,27 @@ mod tests;
 extern crate serialize;
 
 use std::num::Int;
-use std::io::{Writer, BufWriter};
+use std::io::Writer;
 use std::iter;
 use std::default::Default;
 use std::hash::{self, Hasher};
 use std::slice::bytes::copy_memory;
 
 /// Represents a Sha1 hash object in memory.
-// #[derive(Clone)]
 pub struct Sha1 {
-    state: [u32; 5],
+    state: Sha1State,
     buffer: FixedBuffer64,
     length_bits: u64,
+}
+
+#[derive(Clone)]
+struct Sha1State {
+    pub h0: u32,
+    pub h1: u32,
+    pub h2: u32,
+    pub h3: u32,
+    pub h4: u32,
+
 }
 
 /// A FixedBuffer of 64 bytes useful for implementing Sha256 which has a 64 byte blocksize.
@@ -43,6 +52,8 @@ struct FixedBuffer64 {
     buffer: [u8; 64],
     buffer_idx: usize,
 }
+
+impl Copy for FixedBuffer64 {}
 
 /// Write a u32 into a vector, which must be 4 bytes long. The value is written in big-endian
 /// format.
@@ -68,6 +79,72 @@ fn add_bytes_to_bits(bits: u64, bytes: u64) -> u64 {
     }
 }
 
+impl Sha1State {
+    fn new() -> Sha1State {
+        return Sha1State { 
+            h0: 0x67452301, 
+            h1: 0xefcdab89, 
+            h2: 0x98badcfe, 
+            h3: 0x10325476,
+            h4: 0xc3d2e1f0,
+        }
+    }
+
+    fn process_block(&mut self, block: &[u8]) {
+        debug_assert!(block.len() == 64);
+
+        let mut words = [0u32; 80];
+        for (i, chunk) in block.chunks(4).enumerate() {
+            words[i] = (chunk[3] as u32) |
+                       ((chunk[2] as u32) << 8) |
+                       ((chunk[1] as u32) << 16) |
+                       ((chunk[0] as u32) << 24);
+        }
+
+        fn ff(b: u32, c: u32, d: u32) -> u32 { d ^ (b & (c ^ d)) }
+        fn gg(b: u32, c: u32, d: u32) -> u32 { b ^ c ^ d }
+        fn hh(b: u32, c: u32, d: u32) -> u32 { (b & c) | (d & (b | c)) }
+        fn ii(b: u32, c: u32, d: u32) -> u32 { b ^ c ^ d }
+
+        fn left_rotate(x: u32, n: u32) -> u32 { (x << n) | (x >> (32 - n)) }
+
+        for i in range(16, 80) {
+            let n = words[i - 3] ^ words[i - 8] ^ words[i - 14] ^ words[i - 16];
+            words[i] = left_rotate(n, 1);
+        }
+
+        let mut a = self.h0;
+        let mut b = self.h1;
+        let mut c = self.h2;
+        let mut d = self.h3;
+        let mut e = self.h4;
+
+        for i in range(0, 80) {
+            let (f, k) = match i {
+                0 ... 19 => (ff(b, c, d), 0x5a827999),
+                20 ... 39 => (gg(b, c, d), 0x6ed9eba1),
+                40 ... 59 => (hh(b, c, d), 0x8f1bbcdc),
+                60 ... 79 => (ii(b, c, d), 0xca62c1d6),
+                _ => (0, 0),
+            };
+
+            let tmp = left_rotate(a, 5) + f + e + k + words[i];
+            e = d;
+            d = c;
+            c = left_rotate(b, 30);
+            b = a;
+            a = tmp;
+        }
+
+        self.h0 += a;
+        self.h1 += b;
+        self.h2 += c;
+        self.h3 += d;
+        self.h4 += e;
+    }
+
+}
+
 impl FixedBuffer64 {
     /// Create a new FixedBuffer64
     fn new() -> FixedBuffer64 {
@@ -90,14 +167,14 @@ impl FixedBuffer64 {
             let buffer_remaining = size - self.buffer_idx;
             if input.len() >= buffer_remaining {
                     copy_memory(
-                        self.buffer.slice_mut(self.buffer_idx, size),
+                        &mut self.buffer[self.buffer_idx .. size],
                         &input[..buffer_remaining]);
                 self.buffer_idx = 0;
                 func(&self.buffer);
                 i += buffer_remaining;
             } else {
                 copy_memory(
-                    self.buffer.slice_mut(self.buffer_idx, self.buffer_idx + input.len()),
+                    &mut self.buffer[self.buffer_idx .. self.buffer_idx + input.len()],
                     input);
                 self.buffer_idx += input.len();
                 return;
@@ -115,9 +192,7 @@ impl FixedBuffer64 {
         // data left in the input vector will be less than the buffer size and the buffer will
         // be empty.
         let input_remaining = input.len() - i;
-        copy_memory(
-            self.buffer.slice_to_mut(input_remaining),
-            &input[i..]);
+        copy_memory(&mut self.buffer[..input_remaining], &input[i..]);
         self.buffer_idx += input_remaining;
     }
 
@@ -127,7 +202,7 @@ impl FixedBuffer64 {
 
     fn zero_until(&mut self, idx: usize) {
         assert!(idx >= self.buffer_idx);
-        for vp in self.buffer.slice_mut(self.buffer_idx, idx).iter_mut() {
+        for vp in (&mut self.buffer[self.buffer_idx .. idx]).iter_mut() {
             *vp = 0;
         }
         self.buffer_idx = idx;
@@ -135,7 +210,7 @@ impl FixedBuffer64 {
 
     fn next<'s>(&'s mut self, len: usize) -> &'s mut [u8] {
         self.buffer_idx += len;
-        return self.buffer.slice_mut(self.buffer_idx - len, self.buffer_idx);
+        return &mut self.buffer[self.buffer_idx - len .. self.buffer_idx];
     }
 
     fn full_buffer<'s>(&'s mut self) -> &'s [u8] {
@@ -165,10 +240,6 @@ impl FixedBuffer64 {
 }
 
 
-const DEFAULT_STATE : [u32; 5] =
-    [0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476, 0xc3d2e1f0];
-
-
 fn to_hex(input: &[u8]) -> String {
     let mut s = String::new();
     for b in input.iter() {
@@ -180,7 +251,7 @@ fn to_hex(input: &[u8]) -> String {
 impl hash::Hasher for Sha1 {
     type Output = Vec<u8>;
     fn reset(&mut self) {
-        self.state = DEFAULT_STATE;
+        self.state = Sha1State::new();
         self.buffer.reset();
         self.length_bits = 0;
     }
@@ -201,7 +272,8 @@ impl Default for Sha1 {
 impl hash::Writer for Sha1 {
     fn write(&mut self, bytes: &[u8]) {
         self.length_bits = add_bytes_to_bits(self.length_bits, bytes.len() as u64);
-        self.buffer.input(bytes, |input: &[u8]| { self.process_block(input) });
+        let own_state = &mut self.state;
+        self.buffer.input(bytes, |input: &[u8]| { own_state.process_block(input) });
     }
 }
 
@@ -211,67 +283,16 @@ impl Sha1 {
     /// Creates an fresh sha1 hash object.
     pub fn new() -> Sha1 {
         Sha1 {
-            state: DEFAULT_STATE,
+            state: Sha1State::new(),
             buffer: FixedBuffer64::new(),
             length_bits: 0,
         }
     }
 
-    fn process_block(&mut self, block: &[u8]) {
-        debug_assert!(block.len() == 64);
-
-        let mut words = [0u32; 80];
-        for (i, chunk) in block.chunks(4).enumerate() {
-            words[i] = (chunk[3] as u32) |
-                       ((chunk[2] as u32) << 8) |
-                       ((chunk[1] as u32) << 16) |
-                       ((chunk[0] as u32) << 24);
-        }
-
-        fn ff(b: u32, c: u32, d: u32) -> u32 { d ^ (b & (c ^ d)) }
-        fn gg(b: u32, c: u32, d: u32) -> u32 { b ^ c ^ d }
-        fn hh(b: u32, c: u32, d: u32) -> u32 { (b & c) | (d & (b | c)) }
-        fn ii(b: u32, c: u32, d: u32) -> u32 { b ^ c ^ d }
-
-        fn left_rotate(x: u32, n: u32) -> u32 { (x << n) | (x >> (32 - n)) }
-
-        for i in range(16, 80) {
-            let n = words[i - 3] ^ words[i - 8] ^ words[i - 14] ^ words[i - 16];
-            words[i] = left_rotate(n, 1);
-        }
-
-        let mut a = self.state[0];
-        let mut b = self.state[1];
-        let mut c = self.state[2];
-        let mut d = self.state[3];
-        let mut e = self.state[4];
-
-        for i in range(0, 80) {
-            let (f, k) = match i {
-                0 ... 19 => (ff(b, c, d), 0x5a827999),
-                20 ... 39 => (gg(b, c, d), 0x6ed9eba1),
-                40 ... 59 => (hh(b, c, d), 0x8f1bbcdc),
-                60 ... 79 => (ii(b, c, d), 0xca62c1d6),
-                _ => (0, 0),
-            };
-
-            let tmp = left_rotate(a, 5) + f + e + k + words[i];
-            e = d;
-            d = c;
-            c = left_rotate(b, 30);
-            b = a;
-            a = tmp;
-        }
-
-        self.state[0] += a;
-        self.state[1] += b;
-        self.state[2] += c;
-        self.state[3] += d;
-        self.state[4] += e;
-    }
-
     /// Retrieve digest result.  The output must be large enough to
     /// contain result (20 bytes).
+    /// Can be called any amount of times
+    /// TODO: make sure we don't do that
     pub fn output(&self, out: &mut [u8]) {
         let mut m = Sha1 {
             state: self.state.clone(),
@@ -279,17 +300,20 @@ impl Sha1 {
             length_bits: 0,
         };
 
-        m.buffer.standard_padding(8, |input: &[u8]| { m.process_block(input) });
-        write_u32_be(m.buffer.next(4), (m.length_bits >> 32) as u32 );
-        write_u32_be(m.buffer.next(4), m.length_bits as u32);
-        m.process_block(m.buffer.full_buffer());
+        {            
+            let own_state = &mut m.state;
+            m.buffer.standard_padding(8, |input: &[u8]| { own_state.process_block(input) });
+            write_u32_be(m.buffer.next(4), (m.length_bits >> 32) as u32 );
+            write_u32_be(m.buffer.next(4), m.length_bits as u32);
+            own_state.process_block(m.buffer.full_buffer());
+        }
 
         let m = m;
-        write_u32_be(out, m.state[0]);
-        write_u32_be(out, m.state[1]);
-        write_u32_be(out, m.state[2]);
-        write_u32_be(out, m.state[3]);
-        write_u32_be(out, m.state[4]);
+        write_u32_be(out, m.state.h0);
+        write_u32_be(out, m.state.h1);
+        write_u32_be(out, m.state.h2);
+        write_u32_be(out, m.state.h3);
+        write_u32_be(out, m.state.h4);
     }
 
     pub fn hexdigest(&self) -> String {
