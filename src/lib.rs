@@ -297,7 +297,7 @@ impl Sha1 {
         let mut m = Sha1 {
             state: self.state.clone(),
             buffer: self.buffer,
-            length_bits: 0,
+            length_bits: self.length_bits,
         };
 
         {            
@@ -309,11 +309,12 @@ impl Sha1 {
         }
 
         let m = m;
-        write_u32_be(out, m.state.h0);
-        write_u32_be(out, m.state.h1);
-        write_u32_be(out, m.state.h2);
-        write_u32_be(out, m.state.h3);
-        write_u32_be(out, m.state.h4);
+        write_u32_be(&mut out[  ..4], m.state.h0);
+        write_u32_be(&mut out[4 ..8], m.state.h1);
+        write_u32_be(&mut out[8 ..12], m.state.h2);
+        write_u32_be(&mut out[12..16], m.state.h3);
+        write_u32_be(&mut out[16..  ], m.state.h4);
+
     }
 
     pub fn hexdigest(&self) -> String {
