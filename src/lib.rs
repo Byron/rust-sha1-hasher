@@ -25,9 +25,6 @@ extern crate serialize;
 
 use std::num::Int;
 use std::io::Writer;
-use std::iter;
-use std::ptr;
-use std::intrinsics;
 use std::default::Default;
 use std::hash::{self, Hasher};
 use std::slice::bytes::copy_memory;
@@ -93,9 +90,15 @@ impl Sha1State {
     }
 
     fn process_block(&mut self, block: &[u8]) {
-        const bs: usize = 64;
-        const ws: usize = 4;
-        debug_assert!(block.len() == bs);
+        const BS: usize = 64;
+        const WS: usize = 4;
+
+        const K0: u32 = 0x5A827999;
+        const K1: u32 = 0x6ED9EBA1;
+        const K2: u32 = 0x8F1BBCDC;
+        const K3: u32 = 0xCA62C1D6;
+
+        debug_assert!(block.len() == BS);
 
         let mut words = [0u32; 80];
         let wp: *mut u32 =  &mut words[0];
@@ -103,31 +106,13 @@ impl Sha1State {
 
         // process all u8 in block, we use the words as an index (16 with 4 bytes each)
         unsafe {
-            for wi in range(0, bs / ws) {
+            for wi in range(0, BS / WS) {
                 // ptr::write(words.offse)
-                let bi = (wi * ws) as isize;
+                let bi = (wi * WS) as isize;
                 *wp.offset(wi as isize) = ( *bp.offset(bi + 3) as u32) |
                                           ((*bp.offset(bi + 2) as u32) << 8) |
                                           ((*bp.offset(bi + 1) as u32) << 16) |
                                           ((*bp.offset(bi + 0) as u32) << 24);
-            }
-        }
-
-        // NOTE: These functions are automatically inlined. Making this explicit 
-        // changes nothing, nor does using macros
-        fn ff(b: u32, c: u32, d: u32) -> u32 { d ^ (b & (c ^ d)) }
-        fn gg(b: u32, c: u32, d: u32) -> u32 { b ^ c ^ d }
-        fn hh(b: u32, c: u32, d: u32) -> u32 { (b & c) | (d & (b | c)) }
-        fn ii(b: u32, c: u32, d: u32) -> u32 { b ^ c ^ d }
-        fn left_rotate(x: u32, n: u32) -> u32 { (x << n) | (x >> (32 - n)) }
-
-        unsafe {
-            for i in range(16, 80) {
-                let n = *wp.offset(i -  3) ^ 
-                        *wp.offset(i -  8) ^
-                        *wp.offset(i - 14) ^ 
-                        *wp.offset(i - 16);
-                *wp.offset(i) = left_rotate(n, 1);
             }
         }
 
@@ -138,46 +123,84 @@ impl Sha1State {
         let mut e = self.h4;
 
         unsafe {
-            for i in range(0, 20) {
-                let tmp = left_rotate(a, 5) + ff(b, c, d) + e + 0x5a827999 + *wp.offset(i);
-                e = d;
-                d = c;
-                c = left_rotate(b, 30);
+            for i in range(0, 16) {
+                let f = b&c | (!b)&d;
+                let a5 = a<<5 | a>>(32-5);
+                let b30 = b<<30 | b>>(32-30);
+                let t = a5 + f + e + *wp.offset(i&0xf) + K0;
+                a = t;
                 b = a;
-                a = tmp;
+                c = b30;
+                d = c;
+                e = d;
             }
+            for i in range(16, 20) {
+                let tmp = *wp.offset((i-3)&0xf) ^
+                          *wp.offset((i-8)&0xf) ^ 
+                          *wp.offset((i-14)&0xf) ^ 
+                          *wp.offset(i&0xf);
+                *wp.offset(i&0xf) = tmp<<1 | tmp>>(32-1);
 
+                let f = b&c | (!b)&d;
+                let a5 = a<<5 | a>>(32-5);
+                let b30 = b<<30 | b>>(32-30);
+                let t = a5 + f + e + *wp.offset(i&0xf) + K0;
+                a = t;
+                b = a;
+                c = b30;
+                d = c;
+                e = d;
+            }
             for i in range(20, 40) {
-                    
-                let tmp = left_rotate(a, 5) + gg(b, c, d) + e + 0x6ed9eba1 + *wp.offset(i);
-                e = d;
-                d = c;
-                c = left_rotate(b, 30);
+                let tmp = *wp.offset((i-3)&0xf) ^
+                          *wp.offset((i-8)&0xf) ^
+                          *wp.offset((i-14)&0xf) ^
+                          *wp.offset(i&0xf);
+                *wp.offset(i&0xf) = tmp<<1 | tmp>>(32-1);
+                let f = b ^ c ^ d;
+                let a5 = a<<5 | a>>(32-5);
+                let b30 = b<<30 | b>>(32-30);
+                let t = a5 + f + e + *wp.offset(i&0xf) + K1;
+                a = t;
                 b = a;
-                a = tmp;
+                c = b30;
+                d = c;
+                e = d;
             }
-
             for i in range(40, 60) {
-                let tmp = left_rotate(a, 5) + hh(b, c, d) + e + 0x8f1bbcdc + *wp.offset(i);
-                e = d;
-                d = c;
-                c = left_rotate(b, 30);
-                b = a;
-                a = tmp;
-            }
+                let tmp = *wp.offset((i-3)&0xf) ^ 
+                          *wp.offset((i-8)&0xf) ^ 
+                          *wp.offset((i-14)&0xf) ^ 
+                          *wp.offset(i&0xf);
+                *wp.offset(i&0xf) = tmp<<1 | tmp>>(32-1);
+                let f = ((b | c) & d) | (b & c);
 
+                let a5 = a<<5 | a>>(32-5);
+                let b30 = b<<30 | b>>(32-30);
+                let t = a5 + f + e + *wp.offset(i&0xf) + K2;
+                a = t;
+                b = a;
+                c = b30;
+                d = c;
+                e = d;
+            }
             for i in range(60, 80) {
-                let tmp = left_rotate(a, 5) + ii(b, c, d) + e + 0xca62c1d6 + *wp.offset(i);
-                e = d;
-                d = c;
-                c = left_rotate(b, 30);
+                let tmp = *wp.offset((i-3)&0xf) ^ 
+                          *wp.offset((i-8)&0xf) ^ 
+                          *wp.offset((i-14)&0xf) ^ 
+                          *wp.offset(i&0xf);
+                *wp.offset(i&0xf) = tmp<<1 | tmp>>(32-1);
+                let f = b ^ c ^ d;
+                let a5 = a<<5 | a>>(32-5);
+                let b30 = b<<30 | b>>(32-30);
+                let t = a5 + f + e + *wp.offset(i&0xf) + K3;
+                a = t;
                 b = a;
-                a = tmp;
+                c = b30;
+                d = c;
+                e = d;
             }
-        }
-
-
-
+        }// end unsafe
 
         self.h0 += a;
         self.h1 += b;
