@@ -26,6 +26,8 @@ extern crate serialize;
 use std::num::Int;
 use std::io::Writer;
 use std::iter;
+use std::ptr;
+use std::intrinsics;
 use std::default::Default;
 use std::hash::{self, Hasher};
 use std::slice::bytes::copy_memory;
@@ -91,25 +93,42 @@ impl Sha1State {
     }
 
     fn process_block(&mut self, block: &[u8]) {
-        debug_assert!(block.len() == 64);
+        const bs: usize = 64;
+        const ws: usize = 4;
+        debug_assert!(block.len() == bs);
 
         let mut words = [0u32; 80];
-        for (i, chunk) in block.chunks(4).enumerate() {
-            words[i] = (chunk[3] as u32) |
-                       ((chunk[2] as u32) << 8) |
-                       ((chunk[1] as u32) << 16) |
-                       ((chunk[0] as u32) << 24);
+        let wp: *mut u32 =  &mut words[0];
+        let bp: *const u8 = &block[0];
+
+        // process all u8 in block, we use the words as an index (16 with 4 bytes each)
+        unsafe {
+            for wi in range(0, bs / ws) {
+                // ptr::write(words.offse)
+                let bi = (wi * ws) as isize;
+                *wp.offset(wi as isize) = ( *bp.offset(bi + 3) as u32) |
+                                          ((*bp.offset(bi + 2) as u32) << 8) |
+                                          ((*bp.offset(bi + 1) as u32) << 16) |
+                                          ((*bp.offset(bi + 0) as u32) << 24);
+            }
         }
 
+        // NOTE: These functions are automatically inlined. Making this explicit 
+        // changes nothing, nor does using macros
         fn ff(b: u32, c: u32, d: u32) -> u32 { d ^ (b & (c ^ d)) }
         fn gg(b: u32, c: u32, d: u32) -> u32 { b ^ c ^ d }
         fn hh(b: u32, c: u32, d: u32) -> u32 { (b & c) | (d & (b | c)) }
         fn ii(b: u32, c: u32, d: u32) -> u32 { b ^ c ^ d }
         fn left_rotate(x: u32, n: u32) -> u32 { (x << n) | (x >> (32 - n)) }
 
-        for i in range(16, 80) {
-            let n = words[i - 3] ^ words[i - 8] ^ words[i - 14] ^ words[i - 16];
-            words[i] = left_rotate(n, 1);
+        unsafe {
+            for i in range(16, 80) {
+                let n = *wp.offset(i -  3) ^ 
+                        *wp.offset(i -  8) ^
+                        *wp.offset(i - 14) ^ 
+                        *wp.offset(i - 16);
+                *wp.offset(i) = left_rotate(n, 1);
+            }
         }
 
         let mut a = self.h0;
@@ -118,41 +137,43 @@ impl Sha1State {
         let mut d = self.h3;
         let mut e = self.h4;
 
-        for i in range(0, 20) {
-            let tmp = left_rotate(a, 5) + ff(b, c, d) + e + 0x5a827999 + words[i];
-            e = d;
-            d = c;
-            c = left_rotate(b, 30);
-            b = a;
-            a = tmp;
-        }
+        unsafe {
+            for i in range(0, 20) {
+                let tmp = left_rotate(a, 5) + ff(b, c, d) + e + 0x5a827999 + *wp.offset(i);
+                e = d;
+                d = c;
+                c = left_rotate(b, 30);
+                b = a;
+                a = tmp;
+            }
 
-        for i in range(20, 40) {
-                
-            let tmp = left_rotate(a, 5) + gg(b, c, d) + e + 0x6ed9eba1 + words[i];
-            e = d;
-            d = c;
-            c = left_rotate(b, 30);
-            b = a;
-            a = tmp;
-        }
+            for i in range(20, 40) {
+                    
+                let tmp = left_rotate(a, 5) + gg(b, c, d) + e + 0x6ed9eba1 + *wp.offset(i);
+                e = d;
+                d = c;
+                c = left_rotate(b, 30);
+                b = a;
+                a = tmp;
+            }
 
-        for i in range(40, 60) {
-            let tmp = left_rotate(a, 5) + hh(b, c, d) + e + 0x8f1bbcdc + words[i];
-            e = d;
-            d = c;
-            c = left_rotate(b, 30);
-            b = a;
-            a = tmp;
-        }
+            for i in range(40, 60) {
+                let tmp = left_rotate(a, 5) + hh(b, c, d) + e + 0x8f1bbcdc + *wp.offset(i);
+                e = d;
+                d = c;
+                c = left_rotate(b, 30);
+                b = a;
+                a = tmp;
+            }
 
-        for i in range(60, 80) {
-            let tmp = left_rotate(a, 5) + ii(b, c, d) + e + 0xca62c1d6 + words[i];
-            e = d;
-            d = c;
-            c = left_rotate(b, 30);
-            b = a;
-            a = tmp;
+            for i in range(60, 80) {
+                let tmp = left_rotate(a, 5) + ii(b, c, d) + e + 0xca62c1d6 + *wp.offset(i);
+                e = d;
+                d = c;
+                c = left_rotate(b, 30);
+                b = a;
+                a = tmp;
+            }
         }
 
 
