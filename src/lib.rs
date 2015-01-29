@@ -105,7 +105,6 @@ impl Sha1State {
         fn gg(b: u32, c: u32, d: u32) -> u32 { b ^ c ^ d }
         fn hh(b: u32, c: u32, d: u32) -> u32 { (b & c) | (d & (b | c)) }
         fn ii(b: u32, c: u32, d: u32) -> u32 { b ^ c ^ d }
-
         fn left_rotate(x: u32, n: u32) -> u32 { (x << n) | (x >> (32 - n)) }
 
         for i in range(16, 80) {
@@ -119,22 +118,45 @@ impl Sha1State {
         let mut d = self.h3;
         let mut e = self.h4;
 
-        for i in range(0, 80) {
-            let (f, k) = match i {
-                0 ... 19 => (ff(b, c, d), 0x5a827999),
-                20 ... 39 => (gg(b, c, d), 0x6ed9eba1),
-                40 ... 59 => (hh(b, c, d), 0x8f1bbcdc),
-                60 ... 79 => (ii(b, c, d), 0xca62c1d6),
-                _ => (0, 0),
-            };
-
-            let tmp = left_rotate(a, 5) + f + e + k + words[i];
+        for i in range(0, 20) {
+            let tmp = left_rotate(a, 5) + ff(b, c, d) + e + 0x5a827999 + words[i];
             e = d;
             d = c;
             c = left_rotate(b, 30);
             b = a;
             a = tmp;
         }
+
+        for i in range(20, 40) {
+                
+            let tmp = left_rotate(a, 5) + gg(b, c, d) + e + 0x6ed9eba1 + words[i];
+            e = d;
+            d = c;
+            c = left_rotate(b, 30);
+            b = a;
+            a = tmp;
+        }
+
+        for i in range(40, 60) {
+            let tmp = left_rotate(a, 5) + hh(b, c, d) + e + 0x8f1bbcdc + words[i];
+            e = d;
+            d = c;
+            c = left_rotate(b, 30);
+            b = a;
+            a = tmp;
+        }
+
+        for i in range(60, 80) {
+            let tmp = left_rotate(a, 5) + ii(b, c, d) + e + 0xca62c1d6 + words[i];
+            e = d;
+            d = c;
+            c = left_rotate(b, 30);
+            b = a;
+            a = tmp;
+        }
+
+
+
 
         self.h0 += a;
         self.h1 += b;
@@ -300,7 +322,7 @@ impl Sha1 {
             length_bits: self.length_bits,
         };
 
-        {            
+        {    
             let own_state = &mut m.state;
             m.buffer.standard_padding(8, |input: &[u8]| { own_state.process_block(input) });
             write_u32_be(m.buffer.next(4), (m.length_bits >> 32) as u32 );
