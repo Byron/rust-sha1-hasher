@@ -24,16 +24,16 @@ mod tests;
 extern crate serialize;
 
 use std::num::Int;
-use std::io::Writer;
 use std::default::Default;
-use std::hash::{self, Hasher};
+use std::hash::{self, Hasher, Writer};
 use std::slice::bytes::copy_memory;
 
 /// Represents a Sha1 hash object in memory.
 pub struct Sha1 {
     state: Sha1State,
-    buffer: FixedBuffer64,
+    buffer: [u8; CHUNK_SIZE],
     length_bits: u64,
+    nx: usize
 }
 
 #[derive(Clone)]
@@ -46,13 +46,7 @@ struct Sha1State {
 
 }
 
-/// A FixedBuffer of 64 bytes useful for implementing Sha256 which has a 64 byte blocksize.
-struct FixedBuffer64 {
-    buffer: [u8; 64],
-    buffer_idx: usize,
-}
-
-impl Copy for FixedBuffer64 {}
+const CHUNK_SIZE: usize = 64;
 
 /// Write a u32 into a vector, which must be 4 bytes long. The value is written in big-endian
 /// format.
@@ -98,213 +92,121 @@ impl Sha1State {
         const K2: u32 = 0x8F1BBCDC;
         const K3: u32 = 0xCA62C1D6;
 
-        debug_assert!(block.len() == BS);
+        let mut words = [0u32; 16];
 
-        let mut words = [0u32; 80];
-        let wp: *mut u32 =  &mut words[0];
-        let bp: *const u8 = &block[0];
+        assert!(block.len() % CHUNK_SIZE == 0);
 
-        // process all u8 in block, we use the words as an index (16 with 4 bytes each)
-        unsafe {
-            for wi in range(0, BS / WS) {
-                // ptr::write(words.offse)
-                let bi = (wi * WS) as isize;
-                *wp.offset(wi as isize) = ( *bp.offset(bi + 3) as u32) |
-                                          ((*bp.offset(bi + 2) as u32) << 8) |
-                                          ((*bp.offset(bi + 1) as u32) << 16) |
-                                          ((*bp.offset(bi + 0) as u32) << 24);
+        for chunk in block.chunks(CHUNK_SIZE) {
+            let wp: *mut u32 =  &mut words[0];
+            let bp: *const u8 = &chunk[0];
+
+            // process all u8 in block, we use the words as an index (16 with 4 bytes each)
+            unsafe {
+                for wi in range(0, BS / WS) {
+                    // ptr::write(words.offse)
+                    let bi = (wi * WS) as isize;
+                    *wp.offset(wi as isize) = ( *bp.offset(bi + 3) as u32) |
+                                              ((*bp.offset(bi + 2) as u32) << 8) |
+                                              ((*bp.offset(bi + 1) as u32) << 16) |
+                                              ((*bp.offset(bi + 0) as u32) << 24);
+                }
             }
+
+            let mut a = self.h0;
+            let mut b = self.h1;
+            let mut c = self.h2;
+            let mut d = self.h3;
+            let mut e = self.h4;
+
+            unsafe {
+                for i in range(0, 16) {
+                    let f = b&c | (!b)&d;
+                    let a5 = a<<5 | a>>(32-5);
+                    let b30 = b<<30 | b>>(32-30);
+                    let t = a5 + f + e + *wp.offset(i&0xf) + K0;
+                    a = t;
+                    b = a;
+                    c = b30;
+                    d = c;
+                    e = d;
+                }
+                for i in range(16, 20) {
+                    let tmp = *wp.offset((i-3)&0xf) ^
+                              *wp.offset((i-8)&0xf) ^ 
+                              *wp.offset((i-14)&0xf) ^ 
+                              *wp.offset(i&0xf);
+                    *wp.offset(i&0xf) = tmp<<1 | tmp>>(32-1);
+
+                    let f = b&c | (!b)&d;
+                    let a5 = a<<5 | a>>(32-5);
+                    let b30 = b<<30 | b>>(32-30);
+                    let t = a5 + f + e + *wp.offset(i&0xf) + K0;
+                    a = t;
+                    b = a;
+                    c = b30;
+                    d = c;
+                    e = d;
+                }
+                for i in range(20, 40) {
+                    let tmp = *wp.offset((i-3)&0xf) ^
+                              *wp.offset((i-8)&0xf) ^
+                              *wp.offset((i-14)&0xf) ^
+                              *wp.offset(i&0xf);
+                    *wp.offset(i&0xf) = tmp<<1 | tmp>>(32-1);
+                    let f = b ^ c ^ d;
+                    let a5 = a<<5 | a>>(32-5);
+                    let b30 = b<<30 | b>>(32-30);
+                    let t = a5 + f + e + *wp.offset(i&0xf) + K1;
+                    a = t;
+                    b = a;
+                    c = b30;
+                    d = c;
+                    e = d;
+                }
+                for i in range(40, 60) {
+                    let tmp = *wp.offset((i-3)&0xf) ^ 
+                              *wp.offset((i-8)&0xf) ^ 
+                              *wp.offset((i-14)&0xf) ^ 
+                              *wp.offset(i&0xf);
+                    *wp.offset(i&0xf) = tmp<<1 | tmp>>(32-1);
+                    let f = ((b | c) & d) | (b & c);
+
+                    let a5 = a<<5 | a>>(32-5);
+                    let b30 = b<<30 | b>>(32-30);
+                    let t = a5 + f + e + *wp.offset(i&0xf) + K2;
+                    a = t;
+                    b = a;
+                    c = b30;
+                    d = c;
+                    e = d;
+                }
+                for i in range(60, 80) {
+                    let tmp = *wp.offset((i-3)&0xf) ^ 
+                              *wp.offset((i-8)&0xf) ^ 
+                              *wp.offset((i-14)&0xf) ^ 
+                              *wp.offset(i&0xf);
+                    *wp.offset(i&0xf) = tmp<<1 | tmp>>(32-1);
+                    let f = b ^ c ^ d;
+                    let a5 = a<<5 | a>>(32-5);
+                    let b30 = b<<30 | b>>(32-30);
+                    let t = a5 + f + e + *wp.offset(i&0xf) + K3;
+                    a = t;
+                    b = a;
+                    c = b30;
+                    d = c;
+                    e = d;
+                }
+            }// end unsafe
+
+            self.h0 += a;
+            self.h1 += b;
+            self.h2 += c;
+            self.h3 += d;
+            self.h4 += e;
         }
-
-        let mut a = self.h0;
-        let mut b = self.h1;
-        let mut c = self.h2;
-        let mut d = self.h3;
-        let mut e = self.h4;
-
-        unsafe {
-            for i in range(0, 16) {
-                let f = b&c | (!b)&d;
-                let a5 = a<<5 | a>>(32-5);
-                let b30 = b<<30 | b>>(32-30);
-                let t = a5 + f + e + *wp.offset(i&0xf) + K0;
-                a = t;
-                b = a;
-                c = b30;
-                d = c;
-                e = d;
-            }
-            for i in range(16, 20) {
-                let tmp = *wp.offset((i-3)&0xf) ^
-                          *wp.offset((i-8)&0xf) ^ 
-                          *wp.offset((i-14)&0xf) ^ 
-                          *wp.offset(i&0xf);
-                *wp.offset(i&0xf) = tmp<<1 | tmp>>(32-1);
-
-                let f = b&c | (!b)&d;
-                let a5 = a<<5 | a>>(32-5);
-                let b30 = b<<30 | b>>(32-30);
-                let t = a5 + f + e + *wp.offset(i&0xf) + K0;
-                a = t;
-                b = a;
-                c = b30;
-                d = c;
-                e = d;
-            }
-            for i in range(20, 40) {
-                let tmp = *wp.offset((i-3)&0xf) ^
-                          *wp.offset((i-8)&0xf) ^
-                          *wp.offset((i-14)&0xf) ^
-                          *wp.offset(i&0xf);
-                *wp.offset(i&0xf) = tmp<<1 | tmp>>(32-1);
-                let f = b ^ c ^ d;
-                let a5 = a<<5 | a>>(32-5);
-                let b30 = b<<30 | b>>(32-30);
-                let t = a5 + f + e + *wp.offset(i&0xf) + K1;
-                a = t;
-                b = a;
-                c = b30;
-                d = c;
-                e = d;
-            }
-            for i in range(40, 60) {
-                let tmp = *wp.offset((i-3)&0xf) ^ 
-                          *wp.offset((i-8)&0xf) ^ 
-                          *wp.offset((i-14)&0xf) ^ 
-                          *wp.offset(i&0xf);
-                *wp.offset(i&0xf) = tmp<<1 | tmp>>(32-1);
-                let f = ((b | c) & d) | (b & c);
-
-                let a5 = a<<5 | a>>(32-5);
-                let b30 = b<<30 | b>>(32-30);
-                let t = a5 + f + e + *wp.offset(i&0xf) + K2;
-                a = t;
-                b = a;
-                c = b30;
-                d = c;
-                e = d;
-            }
-            for i in range(60, 80) {
-                let tmp = *wp.offset((i-3)&0xf) ^ 
-                          *wp.offset((i-8)&0xf) ^ 
-                          *wp.offset((i-14)&0xf) ^ 
-                          *wp.offset(i&0xf);
-                *wp.offset(i&0xf) = tmp<<1 | tmp>>(32-1);
-                let f = b ^ c ^ d;
-                let a5 = a<<5 | a>>(32-5);
-                let b30 = b<<30 | b>>(32-30);
-                let t = a5 + f + e + *wp.offset(i&0xf) + K3;
-                a = t;
-                b = a;
-                c = b30;
-                d = c;
-                e = d;
-            }
-        }// end unsafe
-
-        self.h0 += a;
-        self.h1 += b;
-        self.h2 += c;
-        self.h3 += d;
-        self.h4 += e;
     }
 
 }
-
-impl FixedBuffer64 {
-    /// Create a new FixedBuffer64
-    fn new() -> FixedBuffer64 {
-        return FixedBuffer64 {
-            buffer: [0u8; 64],
-            buffer_idx: 0
-        };
-    }
-
-       fn input<F>(&mut self, input: &[u8], mut func: F) where
-        F: FnMut(&[u8]),
-    {
-        let mut i = 0;
-
-        let size = self.size();
-
-        // If there is already data in the buffer, copy as much as we can into it and process
-        // the data if the buffer becomes full.
-        if self.buffer_idx != 0 {
-            let buffer_remaining = size - self.buffer_idx;
-            if input.len() >= buffer_remaining {
-                    copy_memory(
-                        &mut self.buffer[self.buffer_idx .. size],
-                        &input[..buffer_remaining]);
-                self.buffer_idx = 0;
-                func(&self.buffer);
-                i += buffer_remaining;
-            } else {
-                copy_memory(
-                    &mut self.buffer[self.buffer_idx .. self.buffer_idx + input.len()],
-                    input);
-                self.buffer_idx += input.len();
-                return;
-            }
-        }
-
-        // While we have at least a full buffer size chunk's worth of data, process that data
-        // without copying it into the buffer
-        while input.len() - i >= size {
-            func(&input[i..(i + size)]);
-            i += size;
-        }
-
-        // Copy any input data into the buffer. At this point in the method, the amount of
-        // data left in the input vector will be less than the buffer size and the buffer will
-        // be empty.
-        let input_remaining = input.len() - i;
-        copy_memory(&mut self.buffer[..input_remaining], &input[i..]);
-        self.buffer_idx += input_remaining;
-    }
-
-    fn reset(&mut self) {
-        self.buffer_idx = 0;
-    }
-
-    fn zero_until(&mut self, idx: usize) {
-        assert!(idx >= self.buffer_idx);
-        for vp in (&mut self.buffer[self.buffer_idx .. idx]).iter_mut() {
-            *vp = 0;
-        }
-        self.buffer_idx = idx;
-    }
-
-    fn next<'s>(&'s mut self, len: usize) -> &'s mut [u8] {
-        self.buffer_idx += len;
-        return &mut self.buffer[self.buffer_idx - len .. self.buffer_idx];
-    }
-
-    fn full_buffer<'s>(&'s mut self) -> &'s [u8] {
-        assert!(self.buffer_idx == 64);
-        self.buffer_idx = 0;
-        return &self.buffer[..64];
-    }
-
-    fn position(&self) -> usize { self.buffer_idx }
-
-    fn remaining(&self) -> usize { 64 - self.buffer_idx }
-
-    fn size(&self) -> usize { 64 }
-
-    fn standard_padding<F>(&mut self, rem: usize, mut func: F) where F: FnMut(&[u8]) {
-        let size = self.size();
-
-        self.next(1)[0] = 128;
-
-        if self.remaining() < rem {
-            self.zero_until(size);
-            func(self.full_buffer());
-        }
-
-        self.zero_until(size - rem);
-    }
-}
-
 
 fn to_hex(input: &[u8]) -> String {
     let mut s = String::new();
@@ -318,8 +220,9 @@ impl hash::Hasher for Sha1 {
     type Output = Vec<u8>;
     fn reset(&mut self) {
         self.state = Sha1State::new();
-        self.buffer.reset();
+        self.buffer = [0u8; CHUNK_SIZE];
         self.length_bits = 0;
+        self.nx = 0;
     }
     fn finish(&self) -> Vec<u8> {
         let mut buf = [0u8; 20].to_vec();
@@ -335,11 +238,38 @@ impl Default for Sha1 {
     }
 }
 
+    fn copy_slice(dst: &mut [u8], src: &[u8]) -> usize {
+        let mut c = 0;
+        for (d, s) in dst.iter_mut().zip(src.iter()) {
+            *d = *s;
+            c += 1;
+        }
+        c 
+    }
+
 impl hash::Writer for Sha1 {
     fn write(&mut self, bytes: &[u8]) {
-        self.length_bits = add_bytes_to_bits(self.length_bits, bytes.len() as u64);
-        let own_state = &mut self.state;
-        self.buffer.input(bytes, |input: &[u8]| { own_state.process_block(input) });
+        let nn = bytes.len();
+        self.length_bits = add_bytes_to_bits(self.length_bits, nn as u64);
+        let mut b = bytes;
+
+        if self.nx > 0 {
+            let n = copy_slice(&mut self.buffer[self.nx .. ], b);
+            self.nx += n;
+            if self.nx == CHUNK_SIZE {
+                self.state.process_block(&self.buffer[]);
+                self.nx = 0;
+            }
+            b = &bytes[n .. ]
+        }
+        if b.len() >= CHUNK_SIZE {
+            let n = b.len() & !(CHUNK_SIZE-1);
+            self.state.process_block(&b[ .. n]);
+            b = &bytes[n .. ];
+        }
+        if b.len() > 0 {
+            self.nx = copy_slice(&mut self.buffer[], b);
+        }
     }
 }
 
@@ -350,8 +280,9 @@ impl Sha1 {
     pub fn new() -> Sha1 {
         Sha1 {
             state: Sha1State::new(),
-            buffer: FixedBuffer64::new(),
+            buffer: [0u8; CHUNK_SIZE],
             length_bits: 0,
+            nx: 0,
         }
     }
 
@@ -364,23 +295,32 @@ impl Sha1 {
             state: self.state.clone(),
             buffer: self.buffer,
             length_bits: self.length_bits,
+            nx: self.nx
         };
 
-        {    
-            let own_state = &mut m.state;
-            m.buffer.standard_padding(8, |input: &[u8]| { own_state.process_block(input) });
-            write_u32_be(m.buffer.next(4), (m.length_bits >> 32) as u32 );
-            write_u32_be(m.buffer.next(4), m.length_bits as u32);
-            own_state.process_block(m.buffer.full_buffer());
+        let mut tmp = [0u8; CHUNK_SIZE];
+        tmp[0] = 0x80u8;
+        let mut len = m.length_bits;
+
+        if len % CHUNK_SIZE as u64 > 56 {
+            m.write(&tmp[0 .. 56-(len%CHUNK_SIZE as u64) as usize]);
+        } else {
+            m.write(&tmp[0 .. CHUNK_SIZE+56-(len%CHUNK_SIZE as u64) as usize])
         }
 
+        len = len<<3;
+        for i in range(0, 8) {
+            tmp[i] = (len >> (56 - 8*i)) as u8;
+        }
+        m.write(&tmp[ .. 8]);
+        assert!(m.nx == 0, "Should have processed chunk by now");
+
         let m = m;
-        write_u32_be(&mut out[  ..4], m.state.h0);
-        write_u32_be(&mut out[4 ..8], m.state.h1);
+        write_u32_be(&mut out[  ..4],  m.state.h0);
+        write_u32_be(&mut out[4 ..8],  m.state.h1);
         write_u32_be(&mut out[8 ..12], m.state.h2);
         write_u32_be(&mut out[12..16], m.state.h3);
         write_u32_be(&mut out[16..  ], m.state.h4);
-
     }
 
     pub fn hexdigest(&self) -> String {
