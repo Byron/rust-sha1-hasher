@@ -1,3 +1,5 @@
+![title-image](https://raw.githubusercontent.com/Byron/rust-sha1-hasher/master/src/png/title-image.png)
+
 # The SHA1 Performance Quest
 
 Follow me on my quest to bring the performance of this implementation up 
