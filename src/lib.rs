@@ -14,23 +14,17 @@
 //! # }
 //! ```
 
-#![feature(slicing_syntax)]
 #![allow(unstable)]
-
-#![experimental]
+#![unstable]
 
 mod tests;
+mod util;
 
 extern crate serialize;
 
-use std::num::Int;
-use std::io::Writer;
-use std::iter;
-use std::ptr;
-use std::intrinsics;
 use std::default::Default;
 use std::hash::{self, Hasher};
-use std::slice::bytes::copy_memory;
+use util::{to_hex, add_bytes_to_bits, write_u32_be, FixedBuffer64};
 
 /// Represents a Sha1 hash object in memory.
 pub struct Sha1 {
@@ -41,44 +35,12 @@ pub struct Sha1 {
 
 #[derive(Clone)]
 struct Sha1State {
-    pub h0: u32,
-    pub h1: u32,
-    pub h2: u32,
-    pub h3: u32,
-    pub h4: u32,
+    h0: u32,
+    h1: u32,
+    h2: u32,
+    h3: u32,
+    h4: u32,
 
-}
-
-/// A FixedBuffer of 64 bytes useful for implementing Sha256 which has a 64 byte blocksize.
-struct FixedBuffer64 {
-    buffer: [u8; 64],
-    buffer_idx: usize,
-}
-
-impl Copy for FixedBuffer64 {}
-
-/// Write a u32 into a vector, which must be 4 bytes long. The value is written in big-endian
-/// format.
-fn write_u32_be(dst: &mut[u8], input: u32) {
-    dst[0] = (input >> 24) as u8;
-    dst[1] = (input >> 16) as u8;
-    dst[2] = (input >> 8) as u8;
-    dst[3] = input as u8;
-}
-
-/// Adds the specified number of bytes to the bit count. panic!() if this would cause numeric
-/// overflow.
-fn add_bytes_to_bits(bits: u64, bytes: u64) -> u64 {
-    let (new_high_bits, new_low_bits) = (bytes >> 61, bytes << 3);
-
-    if new_high_bits > Int::zero() {
-        panic!("numeric overflow occurred.")
-    }
-
-    match bits.checked_add(new_low_bits) {
-        Some(x) => return x,
-        None => panic!("numeric overflow occurred.")
-    }
 }
 
 impl Sha1State {
@@ -93,9 +55,9 @@ impl Sha1State {
     }
 
     fn process_block(&mut self, block: &[u8]) {
-        const bs: usize = 64;
-        const ws: usize = 4;
-        debug_assert!(block.len() == bs);
+        const BS: usize = 64;
+        const WS: usize = 4;
+        debug_assert!(block.len() == BS);
 
         let mut words = [0u32; 80];
         let wp: *mut u32 =  &mut words[0];
@@ -103,9 +65,8 @@ impl Sha1State {
 
         // process all u8 in block, we use the words as an index (16 with 4 bytes each)
         unsafe {
-            for wi in range(0, bs / ws) {
-                // ptr::write(words.offse)
-                let bi = (wi * ws) as isize;
+            for wi in range(0, BS / WS) {
+                let bi = (wi * WS) as isize;
                 *wp.offset(wi as isize) = ( *bp.offset(bi + 3) as u32) |
                                           ((*bp.offset(bi + 2) as u32) << 8) |
                                           ((*bp.offset(bi + 1) as u32) << 16) |
@@ -188,116 +149,15 @@ impl Sha1State {
 
 }
 
-impl FixedBuffer64 {
-    /// Create a new FixedBuffer64
-    fn new() -> FixedBuffer64 {
-        return FixedBuffer64 {
-            buffer: [0u8; 64],
-            buffer_idx: 0
-        };
-    }
-
-       fn input<F>(&mut self, input: &[u8], mut func: F) where
-        F: FnMut(&[u8]),
-    {
-        let mut i = 0;
-
-        let size = self.size();
-
-        // If there is already data in the buffer, copy as much as we can into it and process
-        // the data if the buffer becomes full.
-        if self.buffer_idx != 0 {
-            let buffer_remaining = size - self.buffer_idx;
-            if input.len() >= buffer_remaining {
-                    copy_memory(
-                        &mut self.buffer[self.buffer_idx .. size],
-                        &input[..buffer_remaining]);
-                self.buffer_idx = 0;
-                func(&self.buffer);
-                i += buffer_remaining;
-            } else {
-                copy_memory(
-                    &mut self.buffer[self.buffer_idx .. self.buffer_idx + input.len()],
-                    input);
-                self.buffer_idx += input.len();
-                return;
-            }
-        }
-
-        // While we have at least a full buffer size chunk's worth of data, process that data
-        // without copying it into the buffer
-        while input.len() - i >= size {
-            func(&input[i..(i + size)]);
-            i += size;
-        }
-
-        // Copy any input data into the buffer. At this point in the method, the amount of
-        // data left in the input vector will be less than the buffer size and the buffer will
-        // be empty.
-        let input_remaining = input.len() - i;
-        copy_memory(&mut self.buffer[..input_remaining], &input[i..]);
-        self.buffer_idx += input_remaining;
-    }
-
-    fn reset(&mut self) {
-        self.buffer_idx = 0;
-    }
-
-    fn zero_until(&mut self, idx: usize) {
-        assert!(idx >= self.buffer_idx);
-        for vp in (&mut self.buffer[self.buffer_idx .. idx]).iter_mut() {
-            *vp = 0;
-        }
-        self.buffer_idx = idx;
-    }
-
-    fn next<'s>(&'s mut self, len: usize) -> &'s mut [u8] {
-        self.buffer_idx += len;
-        return &mut self.buffer[self.buffer_idx - len .. self.buffer_idx];
-    }
-
-    fn full_buffer<'s>(&'s mut self) -> &'s [u8] {
-        assert!(self.buffer_idx == 64);
-        self.buffer_idx = 0;
-        return &self.buffer[..64];
-    }
-
-    fn position(&self) -> usize { self.buffer_idx }
-
-    fn remaining(&self) -> usize { 64 - self.buffer_idx }
-
-    fn size(&self) -> usize { 64 }
-
-    fn standard_padding<F>(&mut self, rem: usize, mut func: F) where F: FnMut(&[u8]) {
-        let size = self.size();
-
-        self.next(1)[0] = 128;
-
-        if self.remaining() < rem {
-            self.zero_until(size);
-            func(self.full_buffer());
-        }
-
-        self.zero_until(size - rem);
-    }
-}
-
-
-fn to_hex(input: &[u8]) -> String {
-    let mut s = String::new();
-    for b in input.iter() {
-        s.push_str(&*format!("{:02x}", *b));
-    }
-    return s;
-}
-
 impl hash::Hasher for Sha1 {
     type Output = Vec<u8>;
+
     fn reset(&mut self) {
         self.state = Sha1State::new();
         self.buffer.reset();
         self.length_bits = 0;
     }
+
     fn finish(&self) -> Vec<u8> {
         let mut buf = [0u8; 20].to_vec();
         self.output(&mut *buf);

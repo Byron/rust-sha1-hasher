@@ -3,7 +3,8 @@
 extern crate test;
 
 use self::test::Bencher;
-use super::{Sha1, to_hex};
+use super::Sha1;
+use super::util::to_hex;
 use std::hash::{Writer, Hasher};
 use std::iter;
 
@@ -78,7 +79,7 @@ fn sha1_text_digest_with_assertion(b: &mut Bencher) {
 }
 
 #[bench]
-pub fn sha160_10B_static_input(b: &mut Bencher) {
+pub fn sha160_10_bytes_static_input(b: &mut Bencher) {
     let mut sh = Sha1::new();
     const COUNT: usize = 1000;
     let bytes = [1u8; 10];
