@@ -1,4 +1,4 @@
-![title-image](https://raw.githubusercontent.com/Byron/rust-sha1-hasher/master/src/png/title-image.png)
+[![title-image](https://raw.githubusercontent.com/Byron/rust-sha1-hasher/master/src/png/title-image.png)](http://www.youtube.com/playlist?list=PLMHbQxe1e9MnDKy7FKXZwMJ6t_RCxpHqD)
 
 # The SHA1 Performance Quest
 
