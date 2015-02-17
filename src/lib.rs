@@ -1,9 +1,9 @@
-//! A minimal implementation of SHA1 for rust.
+//! A minimal, somewhat optimized implementation of SHA1 for rust.
 //!
 //! Example:
 //!
 //! ```rust
-//! extern crate "sha1-hasher" as sha1;
+//! extern crate "sha1-hasher-faster" as sha1;
 //! use std::hash::Writer;
 //!
 //! # fn main() {
@@ -13,14 +13,10 @@
 //! assert_eq!(&*m.hexdigest(), "2ef7bde608ce5404e97d5f042f95f89f1c232871");
 //! # }
 //! ```
-
-#![allow(unstable)]
-#![unstable]
+#![feature(hash,core)]
 
 mod tests;
 mod util;
-
-extern crate serialize;
 
 use std::default::Default;
 use std::hash::{self, Hasher};
@@ -65,7 +61,7 @@ impl Sha1State {
 
         // process all u8 in block, we use the words as an index (16 with 4 bytes each)
         unsafe {
-            for wi in range(0, BS / WS) {
+            for wi in 0..BS / WS {
                 let bi = (wi * WS) as isize;
                 *wp.offset(wi as isize) = ( *bp.offset(bi + 3) as u32) |
                                           ((*bp.offset(bi + 2) as u32) << 8) |
@@ -83,7 +79,7 @@ impl Sha1State {
         fn left_rotate(x: u32, n: u32) -> u32 { (x << n) | (x >> (32 - n)) }
 
         unsafe {
-            for i in range(16, 80) {
+            for i in 16..80 {
                 let n = *wp.offset(i -  3) ^ 
                         *wp.offset(i -  8) ^
                         *wp.offset(i - 14) ^ 
@@ -99,7 +95,7 @@ impl Sha1State {
         let mut e = self.h4;
 
         unsafe {
-            for i in range(0, 20) {
+            for i in 0..20 {
                 let tmp = left_rotate(a, 5) + ff(b, c, d) + e + 0x5a827999 + *wp.offset(i);
                 e = d;
                 d = c;
@@ -108,7 +104,7 @@ impl Sha1State {
                 a = tmp;
             }
 
-            for i in range(20, 40) {
+            for i in 20..40 {
                     
                 let tmp = left_rotate(a, 5) + gg(b, c, d) + e + 0x6ed9eba1 + *wp.offset(i);
                 e = d;
@@ -118,7 +114,7 @@ impl Sha1State {
                 a = tmp;
             }
 
-            for i in range(40, 60) {
+            for i in 40..60 {
                 let tmp = left_rotate(a, 5) + hh(b, c, d) + e + 0x8f1bbcdc + *wp.offset(i);
                 e = d;
                 d = c;
@@ -127,7 +123,7 @@ impl Sha1State {
                 a = tmp;
             }
 
-            for i in range(60, 80) {
+            for i in 60..80 {
                 let tmp = left_rotate(a, 5) + ii(b, c, d) + e + 0xca62c1d6 + *wp.offset(i);
                 e = d;
                 d = c;
