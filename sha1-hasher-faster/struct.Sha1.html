@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="rustdoc">
+    <meta name="description" content="API documentation for the Rust `Sha1` struct in crate `sha1-hasher-faster`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, Sha1">
+
+    <title>sha1-hasher-faster::Sha1 - Rust</title>
+
+    <link rel="stylesheet" type="text/css" href="../main.css">
+
+    
+    
+</head>
+<body class="rustdoc">
+    <!--[if lte IE 8]>
+    <div class="warning">
+        This old browser is unsupported and will most likely display funky
+        things.
+    </div>
+    <![endif]-->
+
+    
+
+    <section class="sidebar">
+        
+        <p class='location'><a href='index.html'>sha1-hasher-faster</a></p><div class='block struct'><h2>Structs</h2><a class='struct current' href='struct.Sha1.html' title='Represents a Sha1 hash object in memory.'>Sha1</a></div>
+    </section>
+
+    <nav class="sub">
+        <form class="search-form js-only">
+            <div class="search-container">
+                <input class="search-input" name="search"
+                       autocomplete="off"
+                       placeholder="Click or press 'S' to search, '?' for more options..."
+                       type="search">
+            </div>
+        </form>
+    </nav>
+
+    <section id='main' class="content struct">
+<h1 class='fqn'><span class='in-band'>Struct <a href='index.html'>sha1-hasher-faster</a>::<wbr><a class='struct' href=''>Sha1</a><wbr></span><span class='out-of-band'><span id='render-detail'>
+            <a id="collapse-all" href="#">[-]
+            </a>&nbsp;<a id="expand-all" href="#">[+]</a>
+        </span><a id='src-716' href='../src/sha1-hasher-faster/lib.rs.html#26-30'>[src]</a></span></h1>
+<pre class='rust struct'>pub struct Sha1 {
+    // some fields omitted
+}</pre><div class='docblock'><p>Represents a Sha1 hash object in memory.</p>
+</div><h2 id='methods'>Methods</h2><h3 class='impl'><a class='stability Unmarked' title='No stability level'></a><code>impl <a class='struct' href='../sha1-hasher-faster/struct.Sha1.html' title='sha1-hasher-faster::Sha1'>Sha1</a></code></h3><div class='impl-items'><h4 id='method.new' class='method'><a class='stability Unmarked' title='No stability level'></a><code>fn <a href='#method.new' class='fnname'>new</a>() -&gt; <a class='struct' href='../sha1-hasher-faster/struct.Sha1.html' title='sha1-hasher-faster::Sha1'>Sha1</a></code></h4>
+<div class='docblock'><p>Creates an fresh sha1 hash object.</p>
+</div><h4 id='method.output' class='method'><a class='stability Unmarked' title='No stability level'></a><code>fn <a href='#method.output' class='fnname'>output</a>(&amp;self, out: <a href='http://doc.rust-lang.org/nightly/std/primitive.slice.html'>&amp;mut [</a><a href='http://doc.rust-lang.org/nightly/std/primitive.u8.html'>u8</a><a href='http://doc.rust-lang.org/nightly/std/primitive.slice.html'>]</a>)</code></h4>
+<div class='docblock'><p>Retrieve digest result.  The output must be large enough to
+contain result (20 bytes).
+Can be called any amount of times
+TODO: make sure we don&#39;t do that</p>
+</div><h4 id='method.hexdigest' class='method'><a class='stability Unmarked' title='No stability level'></a><code>fn <a href='#method.hexdigest' class='fnname'>hexdigest</a>(&amp;self) -&gt; <a class='struct' href='http://doc.rust-lang.org/nightly/collections/string/struct.String.html' title='collections::string::String'>String</a></code></h4>
+</div><h2 id='implementations'>Trait Implementations</h2><h3 class='impl'><a class='stability Unstable' title='Unstable: module was recently redesigned'></a><code>impl <a class='trait' href='http://doc.rust-lang.org/nightly/core/hash/trait.Hasher.html' title='core::hash::Hasher'>Hasher</a> for <a class='struct' href='../sha1-hasher-faster/struct.Sha1.html' title='sha1-hasher-faster::Sha1'>Sha1</a></code></h3><div class='impl-items'><h4 id='assoc_type.Output' class='type'><a class='stability Unmarked' title='No stability level'></a><code>type Output = <a class='struct' href='http://doc.rust-lang.org/nightly/collections/vec/struct.Vec.html' title='collections::vec::Vec'>Vec</a>&lt;<a href='http://doc.rust-lang.org/nightly/std/primitive.u8.html'>u8</a>&gt;</code></h4>
+<h4 id='method.reset' class='method'><a class='stability Unstable' title='Unstable: module was recently redesigned'></a><code>fn <a href='#method.reset' class='fnname'>reset</a>(&amp;mut self)</code></h4>
+<h4 id='method.finish' class='method'><a class='stability Unstable' title='Unstable: module was recently redesigned'></a><code>fn <a href='#method.finish' class='fnname'>finish</a>(&amp;self) -&gt; <a class='struct' href='http://doc.rust-lang.org/nightly/collections/vec/struct.Vec.html' title='collections::vec::Vec'>Vec</a>&lt;<a href='http://doc.rust-lang.org/nightly/std/primitive.u8.html'>u8</a>&gt;</code></h4>
+</div><h3 class='impl'><a class='stability Stable' title='Stable'></a><code>impl <a class='trait' href='http://doc.rust-lang.org/nightly/core/default/trait.Default.html' title='core::default::Default'>Default</a> for <a class='struct' href='../sha1-hasher-faster/struct.Sha1.html' title='sha1-hasher-faster::Sha1'>Sha1</a></code></h3><div class='impl-items'><h4 id='method.default' class='method'><a class='stability Stable' title='Stable'></a><code>fn <a href='#method.default' class='fnname'>default</a>() -&gt; <a class='struct' href='../sha1-hasher-faster/struct.Sha1.html' title='sha1-hasher-faster::Sha1'>Sha1</a></code></h4>
+</div><h3 class='impl'><a class='stability Unstable' title='Unstable: this trait will likely be replaced by io::Writer'></a><code>impl <a class='trait' href='http://doc.rust-lang.org/nightly/core/hash/trait.Writer.html' title='core::hash::Writer'>Writer</a> for <a class='struct' href='../sha1-hasher-faster/struct.Sha1.html' title='sha1-hasher-faster::Sha1'>Sha1</a></code></h3><div class='impl-items'><h4 id='method.write' class='method'><a class='stability Unstable' title='Unstable: this trait will likely be replaced by io::Writer'></a><code>fn <a href='#method.write' class='fnname'>write</a>(&amp;mut self, bytes: <a href='http://doc.rust-lang.org/nightly/std/primitive.slice.html'>&amp;[</a><a href='http://doc.rust-lang.org/nightly/std/primitive.u8.html'>u8</a><a href='http://doc.rust-lang.org/nightly/std/primitive.slice.html'>]</a>)</code></h4>
+</div></section>
+    <section id='search' class="content hidden"></section>
+
+    <section class="footer"></section>
+
+    <div id="help" class="hidden">
+        <div class="shortcuts">
+            <h1>Keyboard shortcuts</h1>
+            <dl>
+                <dt>?</dt>
+                <dd>Show this help dialog</dd>
+                <dt>S</dt>
+                <dd>Focus the search field</dd>
+                <dt>&larrb;</dt>
+                <dd>Move up in search results</dd>
+                <dt>&rarrb;</dt>
+                <dd>Move down in search results</dd>
+                <dt>&#9166;</dt>
+                <dd>Go to active search result</dd>
+            </dl>
+        </div>
+        <div class="infos">
+            <h1>Search tricks</h1>
+            <p>
+                Prefix searches with a type followed by a colon (e.g.
+                <code>fn:</code>) to restrict the search to a given type.
+            </p>
+            <p>
+                Accepted types are: <code>fn</code>, <code>mod</code>,
+                <code>struct</code>, <code>enum</code>,
+                <code>trait</code>, <code>typedef</code> (or
+                <code>tdef</code>).
+            </p>
+        </div>
+    </div>
+
+    
+
+    <script>
+        window.rootPath = "../";
+        window.currentCrate = "sha1-hasher-faster";
+        window.playgroundUrl = "";
+    </script>
+    <script src="../jquery.js"></script>
+    <script src="../main.js"></script>
+    
+    <script async src="../search-index.js"></script>
+</body>
+</html>

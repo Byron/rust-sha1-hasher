@@ -1,0 +1,3 @@
+var searchIndex = {};
+searchIndex['sha1-hasher-faster'] = {"items":[[0,"","sha1-hasher-faster","A minimal, somewhat optimized implementation of SHA1 for rust."],[3,"Sha1","","Represents a Sha1 hash object in memory."],[6,"Output","",""],[11,"reset","","",0],[11,"finish","","",0],[11,"default","","",0],[11,"write","","",0],[11,"new","","Creates an fresh sha1 hash object.",0],[11,"output","","Retrieve digest result.  The output must be large enough to\ncontain result (20 bytes).\nCan be called any amount of times\nTODO: make sure we don't do that",0],[11,"hexdigest","","",0]],"paths":[[3,"Sha1"]]};
+initSearch(searchIndex);
