@@ -15,6 +15,19 @@ But ... will it be comparable or even out-pace the competition ?
 
 [![thumb](http://img.youtube.com/vi/JeAYzOLYugQ/0.jpg)](http://www.youtube.com/playlist?list=PLMHbQxe1e9MnDKy7FKXZwMJ6t_RCxpHqD)
 
+# Conclusion
+
+It didn't quite work out as I hoped, as I would have been content only when reaching at least the 400MB/s mark
+delivered by the highly optimized C implementation. However, after re-implementing the highly-efficient Go version
+of the SHA-1 hashing algorithm, we turn out to process only ~320MB/s - far away from the 450MB/s that Go produces.
+
+Unfortunately, due to the added complexity and lack of understanding the entire implementation, a bug or two have slipped
+into our Go-implementation clone, causing it to malfunction. Maybe it's an easy fix ... maybe.
+
+For me it will be best to not spend more time on this, in an attempt to be happy with the working 280MB/s I achieved
+by myself.
+
+**After all, I am content that the fantastic Rust community will at some point produce the SHA1 implementation I always dreamed of**.
 
 # rust-sha1-hasher
 
