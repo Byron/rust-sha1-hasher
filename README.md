@@ -33,6 +33,8 @@ by myself.
 
 **However, [most recent findings](http://youtu.be/RcfJUcGCmWM) clearly show that Rust was compared to a hand-optimized assembly version**, that even C can't compete with. Thus, Rust is actually doing quite well, and *only* 20% behind C after all, which is fully unrolled and hand-optimized as well.
 
+**Second Amendment**: The current version of [rust-crypto](https://github.com/DaGenix/rust-crypto) clocks in at 360MB/s, using an implementation comparable to the fully optimized/unrolled one of C. This also means Rust is just 10% away from C performance, making it truly deliver on its promises ! Totally awesome, the SHA-1 quest for performance got a happy end, finally !
+
 # rust-sha1-hasher
 
 Minimal implementation of SHA1 for Rust. This might go away in the future
