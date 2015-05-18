@@ -1,13 +1,20 @@
-use std::num::Int;
 use std::slice::bytes::copy_memory;
 
 /// A FixedBuffer of 64 bytes useful for implementing Sha256 which has a 64 byte blocksize.
+#[derive(Copy)]
 pub struct FixedBuffer64 {
     buffer: [u8; 64],
     buffer_idx: usize,
 }
 
-impl Copy for FixedBuffer64 {}
+impl Clone  for FixedBuffer64 {
+    fn clone(&self) -> FixedBuffer64 {
+        FixedBuffer64 {
+            buffer: self.buffer,
+            buffer_idx: self.buffer_idx
+        }
+    }
+}
 
 impl FixedBuffer64 {
     /// Create a new FixedBuffer64
@@ -31,15 +38,15 @@ impl FixedBuffer64 {
             let buffer_remaining = size - self.buffer_idx;
             if input.len() >= buffer_remaining {
                     copy_memory(
-                        &mut self.buffer[self.buffer_idx .. size],
-                        &input[..buffer_remaining]);
+                        &input[..buffer_remaining],
+                        &mut self.buffer[self.buffer_idx .. size]);
                 self.buffer_idx = 0;
                 func(&self.buffer);
                 i += buffer_remaining;
             } else {
                 copy_memory(
-                    &mut self.buffer[self.buffer_idx .. self.buffer_idx + input.len()],
-                    input);
+                    input,
+                    &mut self.buffer[self.buffer_idx .. self.buffer_idx + input.len()]);
                 self.buffer_idx += input.len();
                 return;
             }
@@ -56,7 +63,7 @@ impl FixedBuffer64 {
         // data left in the input vector will be less than the buffer size and the buffer will
         // be empty.
         let input_remaining = input.len() - i;
-        copy_memory(&mut self.buffer[..input_remaining], &input[i..]);
+        copy_memory(&input[i..], &mut self.buffer[..input_remaining]);
         self.buffer_idx += input_remaining;
     }
 
@@ -107,7 +114,7 @@ impl FixedBuffer64 {
 pub fn add_bytes_to_bits(bits: u64, bytes: u64) -> u64 {
     let (new_high_bits, new_low_bits) = (bytes >> 61, bytes << 3);
 
-    if new_high_bits > Int::zero() {
+    if new_high_bits > 0 {
         panic!("numeric overflow occurred.")
     }
 

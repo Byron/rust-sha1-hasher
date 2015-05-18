@@ -5,7 +5,7 @@ extern crate test;
 use self::test::Bencher;
 use super::Sha1;
 use super::util::to_hex;
-use std::hash::{Writer, Hasher};
+use std::io::Write;
 use std::iter;
 
 #[test]
@@ -69,7 +69,7 @@ fn sha1_text_digest_with_assertion(b: &mut Bencher) {
     b.bytes = n * s.len() as u64;
     b.iter(|| {
         m.reset();
-        for _ in range(0, n) {
+        for _ in 0..n {
             m.write(s.as_bytes());
         }
         assert_eq!(m.hexdigest(), "7ca27655f67fceaa78ed2e645a81c7f1d6e249d2");
@@ -85,7 +85,7 @@ pub fn sha160_10_bytes_static_input(b: &mut Bencher) {
     let bytes = [1u8; 10];
 
     b.iter(|| {
-        for _ in range(1, COUNT) {
+        for _ in 1..COUNT {
             sh.write(&bytes);
         }
     });
@@ -111,7 +111,7 @@ pub fn sha160_static_input_changing_slice_size(b: &mut Bencher) {
     let mut total = 0;
     b.iter(|| {
         total = 0;
-        iter::range_step(1, BUF_SIZE, 1).map(|x| {
+        (1..BUF_SIZE).map(|x| {
             sh.write(&bytes[0 .. x]);
             total += x;
         }).count();

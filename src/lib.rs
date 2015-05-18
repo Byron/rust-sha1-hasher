@@ -13,13 +13,13 @@
 //! assert_eq!(&*m.hexdigest(), "2ef7bde608ce5404e97d5f042f95f89f1c232871");
 //! # }
 //! ```
-#![feature(hash,core)]
-
+#![feature(core)]
+#![cfg_attr(test, feature(test))]
 mod tests;
 mod util;
 
 use std::default::Default;
-use std::hash::{self, Hasher};
+use std::io::{self, Write};
 use util::{to_hex, add_bytes_to_bits, write_u32_be, FixedBuffer64};
 
 /// Represents a Sha1 hash object in memory.
@@ -145,22 +145,6 @@ impl Sha1State {
 
 }
 
-impl hash::Hasher for Sha1 {
-    type Output = Vec<u8>;
-
-    fn reset(&mut self) {
-        self.state = Sha1State::new();
-        self.buffer.reset();
-        self.length_bits = 0;
-    }
-
-    fn finish(&self) -> Vec<u8> {
-        let mut buf = [0u8; 20].to_vec();
-        self.output(&mut *buf);
-        buf
-    }
-}
-
 impl Default for Sha1 {
     #[inline]
     fn default() -> Sha1 {
@@ -168,11 +152,16 @@ impl Default for Sha1 {
     }
 }
 
-impl hash::Writer for Sha1 {
-    fn write(&mut self, bytes: &[u8]) {
+impl Write for Sha1 {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
         self.length_bits = add_bytes_to_bits(self.length_bits, bytes.len() as u64);
         let own_state = &mut self.state;
         self.buffer.input(bytes, |input: &[u8]| { own_state.process_block(input) });
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
     }
 }
 
@@ -214,6 +203,18 @@ impl Sha1 {
         write_u32_be(&mut out[12..16], m.state.h3);
         write_u32_be(&mut out[16..  ], m.state.h4);
 
+    }
+
+    fn reset(&mut self) {
+        self.state = Sha1State::new();
+        self.buffer.reset();
+        self.length_bits = 0;
+    }
+
+    fn finish(&self) -> Vec<u8> {
+        let mut buf = [0u8; 20].to_vec();
+        self.output(&mut *buf);
+        buf
     }
 
     pub fn hexdigest(&self) -> String {
